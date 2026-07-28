@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sql-server-synchronizer"
+version = "1.0.0"
+description = "SQL Server change tracking synchronizer service"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "My Organization" }]
+dependencies = [
+  "pyodbc>=5.0.0",
+  "APScheduler>=3.10.0",
+  "PyYAML>=6.0",
+  "pydantic>=2.0.0",
+  "pydantic-settings>=2.0.0",
+  "python-dotenv>=1.0.0",
+  "structlog>=24.0.0",
+  "tenacity>=8.2.0",
+  "prometheus-client>=0.17.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0.0",
+  "pytest-cov>=4.0.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-q --cov=src --cov-report=term-missing"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]

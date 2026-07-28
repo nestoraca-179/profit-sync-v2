@@ -1,0 +1,46 @@
+synchronizer:
+  name: "SQLSyncService"
+  version: "1.0.0"
+  run_interval_minutes: 5
+  timezone: "America/Mexico_City"
+
+  local_database:
+    server: "${LOCAL_DB_SERVER}"
+    database: "${LOCAL_DB_NAME}"
+    username: "${LOCAL_DB_USER}"
+    password: "${LOCAL_DB_PASSWORD}"
+    connection_timeout: 30
+    pool_size: 5
+    driver: "ODBC Driver 17 for SQL Server"
+
+  remote_database:
+    server: "${REMOTE_DB_SERVER}"
+    database: "${REMOTE_DB_NAME}"
+    username: "${REMOTE_DB_USER}"
+    password: "${REMOTE_DB_PASSWORD}"
+    connection_timeout: 60
+    pool_size: 3
+    driver: "ODBC Driver 17 for SQL Server"
+
+  synchronization:
+    batch_size: 500
+    max_retries: 3
+    retry_delay_seconds: 60
+    retry_backoff_multiplier: 2
+
+    circuit_breaker:
+      failure_threshold: 5
+      timeout_seconds: 300
+      half_open_timeout_seconds: 60
+
+    conflict_resolution: "timestamp_priority"
+    transactional: true
+    enable_metrics: true
+    enable_health_check: true
+
+    logging:
+      structured_format: true
+      log_rotation_days: 30
+      max_log_size_mb: 100
+      level: "${LOG_LEVEL}"
+      log_directory: "logs"
