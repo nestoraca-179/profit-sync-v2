@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from itertools import islice
-from typing import Iterable, Iterator, TypeVar
+from typing import Iterable, Iterator, List, TypeVar
 from uuid import uuid4
 
 T = TypeVar("T")
@@ -22,3 +22,11 @@ def chunked(items: Iterable[T], size: int) -> Iterator[list[T]]:
     iterator = iter(items)
     while chunk := list(islice(iterator, size)):
         yield chunk
+
+def build_record_id(pk_values: List[str]) -> str:
+    """Build a compound record ID using '|' as a separator."""
+    return '|'.join(pk_values)
+
+def parse_record_id(record_id: str) -> List[str]:
+    """Parse a compound record ID into individual values."""
+    return record_id.split('|')

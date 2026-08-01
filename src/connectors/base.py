@@ -7,6 +7,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
+from src.utils.helpers import parse_record_id
+
 try:
     import pyodbc
 except ImportError:  # pragma: no cover
@@ -107,13 +109,26 @@ class SQLServerConnector(AbstractConnector):
         except Exception:
             return False
 
-    def get_row_by_primary_key(self, table_name: str, primary_key: str, record_id: str) -> dict[str, Any] | None:
+    def get_row_by_primary_key(self, table_name: str, primary_key: str | list[str], record_id: str | list[str]) -> dict[str, Any] | None:
         safe_table = validate_identifier(table_name)
-        safe_pk = validate_identifier(primary_key)
-        rows = self.execute_query(
-            f"SELECT * FROM {safe_table} WHERE {safe_pk} = ?",
-            {"record_id": record_id},
-        )
+
+        # If the primary key is a list, we need to handle composite keys
+        if isinstance(primary_key, list):
+            pk_columns = [validate_identifier(pk) for pk in primary_key]
+            pk_values = record_id if isinstance(record_id, list) else parse_record_id(record_id)
+            where_clause = ' AND '.join([f"{pk} = ?" for pk in pk_columns])
+            params = dict(zip(pk_columns, pk_values))
+            rows = self.execute_query(
+                f"SELECT * FROM {safe_table} WHERE {where_clause}",
+                params,
+            )
+        else:
+            safe_pk = validate_identifier(primary_key)
+            rows = self.execute_query(
+                f"SELECT * FROM {safe_table} WHERE {safe_pk} = ?",
+                {"record_id": record_id},
+            )
+
         return rows[0] if rows else None
 
     def _require_connection(self) -> Any:

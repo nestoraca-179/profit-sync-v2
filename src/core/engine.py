@@ -22,11 +22,11 @@ from src.core.exceptions import CircuitBreakerOpenError, ErrorCategory, Processi
 from src.core.state_manager import StateManager
 from src.detectors.sql_server_detector import SQLServerChangeDetector
 from src.logging.logger_setup import get_logger
-from src.models.sync_operation import SyncOperation
+from src.models.sync_operation import OperationType, SyncOperation
 from src.models.table_config import TableConfig
 from src.processors.batch_processor import BatchProcessor
 from src.utils.circuit_breaker import CircuitBreaker
-from src.utils.helpers import chunked, generate_sync_id
+from src.utils.helpers import chunked, generate_sync_id, parse_record_id
 from src.utils.retry_decorator import build_retry_decorator
 from src.utils.validators import validate_identifier
 
@@ -353,16 +353,27 @@ class SynchronizationEngine:
         grouped: dict[str, list[SyncOperation]] = defaultdict(list)
         for row in rows:
             payload = json.loads(row["RecordData"]) if row.get("RecordData") else None
+            # Obtener PK values desde RecordData o construir desde RecordId
+            pk_values = []
+            if payload:
+                table_config = self._table_config(row["TableName"])
+                pk_columns = table_config.primary_key if isinstance(table_config.primary_key, list) else [table_config.primary_key]
+                pk_values = [str(payload.get(pk, "")) for pk in pk_columns]
+            if not pk_values:
+                pk_values = parse_record_id(str(row["RecordId"]))
+
             grouped[row["TableName"]].append(
                 SyncOperation(
                     table_name=row["TableName"],
                     record_id=str(row["RecordId"]),
-                    operation_type=row["OperationType"],
+                    pk_values=pk_values,  # ← Agregar este campo
+                    operation_type=OperationType(row["OperationType"]),
                     change_version=int(row["ChangeVersion"]),
                     data=payload,
                     retry_count=int(row.get("RetryCount") or 0),
                 )
             )
+
         return grouped
 
     def _replay_pending(

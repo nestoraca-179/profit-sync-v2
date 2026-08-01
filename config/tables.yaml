@@ -1,7 +1,7 @@
 tables:
   - name: "saDocumentoVenta"
     enabled: true
-    primary_key: "IdDocumento"
+    primary_key: ["co_tipo_doc", "nro_doc"]
     version_column: "rowversion"
     dependencies: []
     order: 1
@@ -9,7 +9,7 @@ tables:
 
   - name: "saFacturaVenta"
     enabled: true
-    primary_key: "IdFactura"
+    primary_key: "doc_num"
     version_column: "rowversion"
     dependencies: ["saDocumentoVenta"]
     order: 2
@@ -17,7 +17,7 @@ tables:
 
   - name: "saFacturaVentaReng"
     enabled: true
-    primary_key: "IdRenglon"
+    primary_key: ["doc_num", "reng_num"]
     version_column: "rowversion"
     dependencies: ["saFacturaVenta"]
     order: 3
