@@ -39,8 +39,8 @@ class AbstractConnector(ABC):
 
     @contextmanager
     @abstractmethod
-    def transaction(self) -> Iterator[None]:
-        """Context manager for transactional execution."""
+    def transaction(self) -> Iterator[Any]:
+        """Context manager that yields a cursor for transactional execution."""
         yield
 
     @abstractmethod
@@ -92,10 +92,11 @@ class SQLServerConnector(AbstractConnector):
         return cursor.rowcount if cursor.rowcount >= 0 else 0
 
     @contextmanager
-    def transaction(self) -> Iterator[None]:
+    def transaction(self) -> Iterator[Any]:
         connection = self._require_connection()
+        cursor = connection.cursor()
         try:
-            yield
+            yield cursor
             connection.commit()
         except Exception:
             connection.rollback()

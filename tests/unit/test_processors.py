@@ -7,20 +7,21 @@ class FakeConnector:
         self.commands = []
 
     def transaction(self):
+        connector = self
+
         class _Context:
             def __enter__(self_nonlocal):
-                return None
+                return connector
 
             def __exit__(self_nonlocal, exc_type, exc, tb):
                 return False
 
         return _Context()
 
-    def execute_non_query(self, query, params=None):
+    def execute(self, query, params):
         self.commands.append((query, params))
-        return 1
 
-def test_process_changes_uses_merge_for_upserts():
+def test_process_changes_inserts_configured_primary_key():
     connector = FakeConnector()
     processor = BatchProcessor(connector, [TableConfig(name="saDocumentoVenta", primary_key="IdDocumento")])
 
@@ -39,7 +40,8 @@ def test_process_changes_uses_merge_for_upserts():
     )
 
     assert stats["saDocumentoVenta"] == 1
-    assert "MERGE saDocumentoVenta" in connector.commands[0][0]
+    assert "INSERT INTO saDocumentoVenta ([IdDocumento], [Descripcion])" in connector.commands[0][0]
+    assert connector.commands[0][1] == ["1", "Demo"]
 
 def test_process_changes_uses_delete_for_delete_operations():
     connector = FakeConnector()
@@ -59,3 +61,4 @@ def test_process_changes_uses_delete_for_delete_operations():
     )
 
     assert "DELETE FROM saDocumentoVenta" in connector.commands[0][0]
+    assert connector.commands[0][1] == ["1"]

@@ -1,13 +1,13 @@
 """SQL Server Change Tracking detector implementation."""
 
 from __future__ import annotations
-from typing import Any, List, Union
+from typing import Any, List
 from src.connectors.base import SQLServerConnector
 from src.core.exceptions import ChangeDetectionError, ErrorCategory
 from src.detectors.base import AbstractChangeDetector
 from src.models.sync_operation import OperationType, SyncOperation
 from src.models.table_config import TableConfig
-from src.utils.helpers import utc_now, build_record_id, parse_record_id
+from src.utils.helpers import utc_now, build_record_id
 from src.utils.validators import validate_identifier
 
 class SQLServerChangeDetector(AbstractChangeDetector):
@@ -24,7 +24,6 @@ class SQLServerChangeDetector(AbstractChangeDetector):
         table = self.table_map[table_name]
         safe_table = validate_identifier(table_name)
 
-        # Get primary key columns for the table
         pk_columns = self._get_primary_key_columns(table_name)
         safe_pk_list = [validate_identifier(pk) for pk in pk_columns]
 
@@ -75,24 +74,12 @@ class SQLServerChangeDetector(AbstractChangeDetector):
         return int(rows[0]["version"])
 
     def _get_primary_key_columns(self, table_name: str) -> List[str]:
-        """Obtiene las columnas de la PK de una tabla."""
-        safe_table = validate_identifier(table_name)
-        query = """
-        SELECT COLUMN_NAME
-        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-        WHERE OBJECTPROPERTY(OBJECT_ID(CONSTRAINT_SCHEMA + '.' + CONSTRAINT_NAME), 'IsPrimaryKey') = 1
-        AND TABLE_NAME = ?
-        ORDER BY ORDINAL_POSITION
-        """
-        rows = self.connector.execute_query(query, {"table_name": safe_table})
-        if not rows:
-            # Fallback: usar la PK definida en config
-            table_config = self.table_map.get(table_name)
-            if table_config and isinstance(table_config.primary_key, list):
-                return table_config.primary_key
-            return ["Id"]  # Default fallback
-
-        return [row["COLUMN_NAME"] for row in rows]
+        """Return the primary key configured for the synchronized table."""
+        table_config = self.table_map.get(table_name)
+        if table_config is None:
+            raise ValueError(f"Table {table_name} is not configured")
+        primary_key = table_config.primary_key
+        return primary_key if isinstance(primary_key, list) else [primary_key]
 
     def _normalize_payload(self, row: dict[str, Any], primary_keys: List[str]) -> dict[str, Any]:
         """Normaliza el payload excluyendo columnas de sistema y PKs."""

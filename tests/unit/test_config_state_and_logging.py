@@ -43,7 +43,8 @@ class FakeConnector:
         return 1
 
 def test_config_loader_loads_project_configuration():
-    loader = ConfigLoader(base_path=Path("c:/My Organization/AP/python/synchronizer"))
+    project_root = Path(__file__).resolve().parents[2]
+    loader = ConfigLoader(base_path=project_root)
     config = loader.load()
 
     assert config.synchronizer.name == "SQLSyncService"

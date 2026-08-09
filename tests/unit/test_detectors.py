@@ -32,6 +32,14 @@ def test_detect_changes_maps_change_tracking_rows():
     assert changes[0].record_id == "7"
     assert changes[0].data["Descripcion"] == "Factura A"
 
+def test_detector_uses_configured_single_primary_key():
+    detector = SQLServerChangeDetector(
+        connector=FakeConnector([]),
+        tables=[TableConfig(name="saFacturaVenta", primary_key="doc_num")],
+    )
+
+    assert detector._get_primary_key_columns("saFacturaVenta") == ["doc_num"]
+
 def test_get_current_version_reads_change_tracking_version():
     detector = SQLServerChangeDetector(
         connector=FakeConnector([]),
