@@ -61,6 +61,19 @@ def test_circuit_breaker_transitions_between_states():
     breaker.record_success()
     assert breaker.state == CircuitBreakerState.CLOSED
 
+def test_circuit_breaker_allows_only_one_half_open_probe():
+    breaker = CircuitBreaker(failure_threshold=1, timeout_seconds=0, half_open_timeout_seconds=60)
+
+    breaker.record_failure("initial failure")
+
+    assert breaker.allow_request() is True
+    assert breaker.state == CircuitBreakerState.HALF_OPEN
+    assert breaker.allow_request() is False
+
+    breaker.record_failure("recovery probe failed")
+    assert breaker.state == CircuitBreakerState.OPEN
+    assert breaker.allow_request() is True
+
 def test_retry_decorator_retries_until_success():
     calls = {"count": 0}
 

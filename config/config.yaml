@@ -2,7 +2,7 @@ synchronizer:
   name: "SQLSyncService"
   version: "1.0.0"
   run_interval_minutes: 5
-  timezone: "America/Mexico_City"
+  timezone: "America/Caracas"
 
   local_database:
     server: "${LOCAL_DB_SERVER}"
