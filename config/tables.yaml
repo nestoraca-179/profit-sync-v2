@@ -22,3 +22,83 @@ tables:
     dependencies: ["saFacturaVenta"]
     order: 3
     batch_size: 500
+
+  - name: "saCaja"
+    enabled: true
+    primary_key: "cod_caja"
+    version_column: "rowversion"
+    dependencies: []
+    order: 4
+    batch_size: 500
+
+  - name: "saCobro"
+    enabled: true
+    primary_key: "cob_num"
+    version_column: "rowversion"
+    dependencies: []
+    order: 5
+    batch_size: 500
+
+  - name: "saMovimientoBanco"
+    enabled: true
+    primary_key: "mov_num"
+    version_column: "rowversion"
+    dependencies: []
+    order: 6
+    batch_size: 500
+
+  - name: "saMovimientoCaja"
+    enabled: true
+    primary_key: "mov_num"
+    version_column: "rowversion"
+    dependencies: ["saCaja"]
+    order: 7
+    batch_size: 500
+
+  - name: "saCobroDocReng"
+    enabled: true
+    primary_key: ["reng_num", "cob_num"]
+    version_column: "rowversion"
+    dependencies: ["saCobro", "saDocumentoVenta"]
+    order: 8
+    batch_size: 500
+
+  - name: "saCobroTPReng"
+    enabled: true
+    primary_key: ["reng_num", "cob_num"]
+    version_column: "rowversion"
+    dependencies: ["saCobro", "saCaja", "saMovimientoCaja", "saMovimientoBanco"]
+    order: 9
+    batch_size: 500
+
+  - name: "saCobroRentenReng"
+    enabled: true
+    primary_key: ["reng_num", "rowguid_reng_cob"]
+    version_column: "rowversion"
+    dependencies: ["saCobro"]
+    order: 10
+    batch_size: 500
+
+  - name: "saCobroRetenIvaReng"
+    enabled: true
+    primary_key: ["reng_num", "rowguid_reng_cob"]
+    version_column: "rowversion"
+    dependencies: ["saCobro"]
+    order: 11
+    batch_size: 500
+
+  - name: "saSaldoCaja"
+    enabled: true
+    primary_key: ["cod_caja", "tipo"]
+    version_column: "rowversion"
+    dependencies: ["saCaja"]
+    order: 12
+    batch_size: 500
+
+  - name: "saSaldoBanco"
+    enabled: true
+    primary_key: ["cod_cta", "tipo"]
+    version_column: "rowversion"
+    dependencies: []
+    order: 13
+    batch_size: 500
