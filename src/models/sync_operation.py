@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, List, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -20,7 +20,7 @@ class SyncOperation(BaseModel):
 
     table_name: str
     record_id: str
-    pk_values: List[str] = Field(default_factory=list)
+    pk_values: List[Any] = Field(default_factory=list)
     operation_type: OperationType
     change_version: int
     data: Optional[Dict[str, Any]] = None

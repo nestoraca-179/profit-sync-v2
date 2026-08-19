@@ -27,8 +27,11 @@ class SQLServerChangeDetector(AbstractChangeDetector):
         pk_columns = self._get_primary_key_columns(table_name)
         safe_pk_list = [validate_identifier(pk) for pk in pk_columns]
 
-        # Build SELECT with multiple PKs
-        pk_select = ', '.join([f"CT.{pk}" for pk in safe_pk_list])
+        pk_aliases = [f"__sync_pk_{index}" for index, _ in enumerate(safe_pk_list)]
+        pk_select = ", ".join(
+            f"CT.[{column}] AS [{alias}]"
+            for column, alias in zip(safe_pk_list, pk_aliases, strict=True)
+        )
         pk_join = ' AND '.join([f"T.{pk} = CT.{pk}" for pk in safe_pk_list])
 
         query = (
@@ -47,11 +50,10 @@ class SQLServerChangeDetector(AbstractChangeDetector):
         for row in rows:
             operation = OperationType(row["SYS_CHANGE_OPERATION"])
 
-            # Build compound record_id
-            pk_values = [str(row[pk]) for pk in safe_pk_list]
-            record_id = build_record_id(pk_values)
+            pk_values = [row[alias] for alias in pk_aliases]
+            record_id = build_record_id([str(value) for value in pk_values])
 
-            payload = self._normalize_payload(row, safe_pk_list)
+            payload = self._normalize_payload(table, row, pk_aliases)
             operations.append(
                 SyncOperation(
                     table_name=table_name,
@@ -81,13 +83,23 @@ class SQLServerChangeDetector(AbstractChangeDetector):
         primary_key = table_config.primary_key
         return primary_key if isinstance(primary_key, list) else [primary_key]
 
-    def _normalize_payload(self, row: dict[str, Any], primary_keys: List[str]) -> dict[str, Any]:
-        """Normaliza el payload excluyendo columnas de sistema y PKs."""
-        exclude_keys = {"SYS_CHANGE_OPERATION", "SYS_CHANGE_VERSION"} | set(primary_keys)
+    def _normalize_payload(self, table: TableConfig, row: dict[str, Any], pk_aliases: List[str]) -> dict[str, Any]:
+        """Build a writable payload without system, PK, or rowversion columns."""
+        primary_keys = self._get_primary_key_columns(table.name)
+        excluded_columns = {
+            "sys_change_operation",
+            "sys_change_version",
+            "timestamp",
+            "rowversion",
+            *(column.lower() for column in primary_keys),
+            *(alias.lower() for alias in pk_aliases),
+        }
+        if table.version_column:
+            excluded_columns.add(table.version_column.lower())
         return {
             key: value
             for key, value in row.items()
-            if key not in exclude_keys
-            and key is not None
+            if key is not None
+            and key.lower() not in excluded_columns
             and value is not None
         }

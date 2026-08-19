@@ -54,6 +54,7 @@ class SQLServerConnector(AbstractConnector):
         self.settings = settings
         self.source_name = source_name
         self._connection: Any | None = None
+        self._transaction_depth = 0
 
     def connect(self) -> None:
         if pyodbc is None:
@@ -89,18 +90,26 @@ class SQLServerConnector(AbstractConnector):
         connection = self._require_connection()
         cursor = connection.cursor()
         cursor.execute(query, self._ordered_values(params))
+        if self._transaction_depth == 0:
+            connection.commit()
+
         return cursor.rowcount if cursor.rowcount >= 0 else 0
 
     @contextmanager
     def transaction(self) -> Iterator[Any]:
         connection = self._require_connection()
         cursor = connection.cursor()
+        self._transaction_depth += 1
         try:
             yield cursor
-            connection.commit()
+            if self._transaction_depth == 1:
+                connection.commit()
         except Exception:
-            connection.rollback()
+            if self._transaction_depth == 1:
+                connection.rollback()
             raise
+        finally:
+            self._transaction_depth -= 1
 
     def test_connection(self) -> bool:
         try:

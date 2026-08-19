@@ -8,6 +8,8 @@ import socket
 import threading
 import time
 from collections import defaultdict
+from datetime import date, datetime
+from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -352,21 +354,19 @@ class SynchronizationEngine:
         rows = connector.execute_query(query, {"status": "PENDING"})
         grouped: dict[str, list[SyncOperation]] = defaultdict(list)
         for row in rows:
-            payload = json.loads(row["RecordData"]) if row.get("RecordData") else None
-            # Obtener PK values desde RecordData o construir desde RecordId
-            pk_values = []
-            if payload:
-                table_config = self._table_config(row["TableName"])
-                pk_columns = table_config.primary_key if isinstance(table_config.primary_key, list) else [table_config.primary_key]
-                pk_values = [str(payload.get(pk, "")) for pk in pk_columns]
-            if not pk_values:
+            stored_data = json.loads(row["RecordData"]) if row.get("RecordData") else {}
+            if "data" in stored_data and "pk_values" in stored_data:
+                payload = stored_data["data"]
+                pk_values = stored_data["pk_values"]
+            else:
+                payload = stored_data or None
                 pk_values = parse_record_id(str(row["RecordId"]))
 
             grouped[row["TableName"]].append(
                 SyncOperation(
                     table_name=row["TableName"],
                     record_id=str(row["RecordId"]),
-                    pk_values=pk_values,  # ← Agregar este campo
+                    pk_values=pk_values,
                     operation_type=OperationType(row["OperationType"]),
                     change_version=int(row["ChangeVersion"]),
                     data=payload,
@@ -403,13 +403,24 @@ class SynchronizationEngine:
                     "table_name": operation.table_name,
                     "record_id": operation.record_id,
                     "operation_type": operation.operation_type.value,
-                    "record_data": json.dumps(operation.data) if operation.data else None,
+                    "record_data": json.dumps(
+                        {"data": operation.data, "pk_values": operation.pk_values},
+                        default=self._json_default,
+                    ),
                     "change_version": operation.change_version,
                     "retry_count": operation.retry_count + 1,
                     "last_error": error_message,
                     "status": "PENDING",
                 },
             )
+
+    @staticmethod
+    def _json_default(value: Any) -> str:
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()
+        raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
     def _mark_pending_completed(
         self,

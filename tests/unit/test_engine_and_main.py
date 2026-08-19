@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -187,6 +189,23 @@ def test_engine_queues_pending_operations_on_failure(monkeypatch):
 
     assert engine.local_state.failures
     assert any("INSERT INTO PendingOperations" in command for command, _ in local.executed)
+
+def test_engine_queues_decimal_payload_and_preserves_primary_key(monkeypatch):
+    engine, local, _ = build_engine(monkeypatch)
+    operation = SyncOperation(
+        table_name="saDocumentoVenta",
+        record_id="7",
+        pk_values=[7],
+        operation_type=OperationType.INSERT,
+        change_version=2,
+        data={"Monto": Decimal("12.50")},
+    )
+
+    engine._queue_pending_operations(local, [operation], "write failed")
+
+    _, params = local.executed[-1]
+    stored = json.loads(params["record_data"])
+    assert stored == {"data": {"Monto": "12.50"}, "pk_values": [7]}
 
 def test_engine_validates_preconditions(monkeypatch):
     engine, _, remote = build_engine(monkeypatch)

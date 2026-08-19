@@ -74,6 +74,15 @@ def test_sql_server_connector_executes_queries_and_transactions(monkeypatch):
     assert fake_connection.committed is True
     assert fake_connection.closed is True
 
+def test_sql_server_connector_commits_standalone_writes(monkeypatch):
+    fake_connection = FakeConnection()
+    monkeypatch.setattr(connector_module, "pyodbc", type("FakePyodbc", (), {"connect": staticmethod(lambda *a, **k: fake_connection)}))
+    connector = SQLServerConnector(build_settings(), source_name="local")
+
+    connector.execute_non_query("UPDATE SyncControl SET SyncStatus = ?", {"status": "COMPLETED"})
+
+    assert fake_connection.committed is True
+
 def test_connector_test_connection_returns_false_on_failure(monkeypatch):
     monkeypatch.setattr(connector_module, "pyodbc", type("FakePyodbc", (), {"connect": staticmethod(lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))}))
     connector = SQLServerConnector(build_settings(), source_name="remote")

@@ -7,6 +7,10 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl gnupg unixodbc unixodbc-dev gcc g++ \
+    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
+    && curl -fsSL https://packages.microsoft.com/config/debian/12/prod.list | sed 's#^deb #deb [signed-by=/usr/share/keyrings/microsoft-prod.gpg] #' > /etc/apt/sources.list.d/microsoft-prod.list \
+    && apt-get update \
+    && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql17 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./

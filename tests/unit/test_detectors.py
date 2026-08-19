@@ -17,9 +17,10 @@ def test_detect_changes_maps_change_tracking_rows():
                 {
                     "SYS_CHANGE_OPERATION": "I",
                     "SYS_CHANGE_VERSION": 10,
-                    "RecordId": 7,
+                    "__sync_pk_0": 7,
                     "IdDocumento": 7,
                     "Descripcion": "Factura A",
+                    "timestamp": b"\x00\x00\x00\x01",
                 }
             ]
         ),
@@ -30,7 +31,30 @@ def test_detect_changes_maps_change_tracking_rows():
 
     assert len(changes) == 1
     assert changes[0].record_id == "7"
+    assert changes[0].pk_values == [7]
     assert changes[0].data["Descripcion"] == "Factura A"
+    assert "timestamp" not in changes[0].data
+
+def test_detector_uses_change_tracking_key_for_delete():
+    detector = SQLServerChangeDetector(
+        connector=FakeConnector(
+            [
+                {
+                    "SYS_CHANGE_OPERATION": "D",
+                    "SYS_CHANGE_VERSION": 11,
+                    "__sync_pk_0": 42,
+                    "doc_num": None,
+                }
+            ]
+        ),
+        tables=[TableConfig(name="saFacturaVenta", primary_key="doc_num")],
+    )
+
+    changes = detector.detect_changes("saFacturaVenta", 0)
+
+    assert changes[0].record_id == "42"
+    assert changes[0].pk_values == [42]
+    assert changes[0].data is None
 
 def test_detector_uses_configured_single_primary_key():
     detector = SQLServerChangeDetector(
