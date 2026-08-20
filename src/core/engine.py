@@ -420,7 +420,9 @@ class SynchronizationEngine:
             return str(value)
         if isinstance(value, (datetime, date)):
             return value.isoformat()
-        raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+        if isinstance(value, bytes):
+            return value.hex()
+        return str(value)
 
     def _mark_pending_completed(
         self,

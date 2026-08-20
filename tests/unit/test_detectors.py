@@ -2,12 +2,15 @@ from src.detectors.sql_server_detector import SQLServerChangeDetector
 from src.models.table_config import TableConfig
 
 class FakeConnector:
-    def __init__(self, rows):
+    def __init__(self, rows, metadata=None):
         self.rows = rows
+        self.metadata = metadata
 
     def execute_query(self, query, params=None):
         if "CHANGE_TRACKING_CURRENT_VERSION" in query:
             return [{"version": 42}]
+        if "INFORMATION_SCHEMA.COLUMNS" in query:
+            return self.metadata if self.metadata is not None else self.rows
         return self.rows
 
 def test_detect_changes_maps_change_tracking_rows():
@@ -22,7 +25,11 @@ def test_detect_changes_maps_change_tracking_rows():
                     "Descripcion": "Factura A",
                     "timestamp": b"\x00\x00\x00\x01",
                 }
-            ]
+            ],
+            metadata=[
+                {"COLUMN_NAME": "IdDocumento"},
+                {"COLUMN_NAME": "Descripcion"},
+            ],
         ),
         tables=[TableConfig(name="saDocumentoVenta", primary_key="IdDocumento")],
     )

@@ -207,6 +207,23 @@ def test_engine_queues_decimal_payload_and_preserves_primary_key(monkeypatch):
     stored = json.loads(params["record_data"])
     assert stored == {"data": {"Monto": "12.50"}, "pk_values": [7]}
 
+def test_engine_queues_binary_payload_without_failing(monkeypatch):
+    engine, local, _ = build_engine(monkeypatch)
+    operation = SyncOperation(
+        table_name="saDocumentoVenta",
+        record_id="7",
+        pk_values=[7],
+        operation_type=OperationType.INSERT,
+        change_version=2,
+        data={"Validador": b"\x00\xff"},
+    )
+
+    engine._queue_pending_operations(local, [operation], "write failed")
+
+    _, params = local.executed[-1]
+    stored = json.loads(params["record_data"])
+    assert stored["data"]["Validador"] == "00ff"
+
 def test_engine_validates_preconditions(monkeypatch):
     engine, _, remote = build_engine(monkeypatch)
     engine.circuit_breaker.state = engine.circuit_breaker.state.OPEN

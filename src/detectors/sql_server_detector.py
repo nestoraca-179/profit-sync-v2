@@ -28,15 +28,26 @@ class SQLServerChangeDetector(AbstractChangeDetector):
         safe_pk_list = [validate_identifier(pk) for pk in pk_columns]
 
         pk_aliases = [f"__sync_pk_{index}" for index, _ in enumerate(safe_pk_list)]
-        pk_select = ", ".join(
+        select_parts = [
+            "CT.SYS_CHANGE_OPERATION",
+            "CT.SYS_CHANGE_VERSION",
+        ]
+        select_parts.extend(
             f"CT.[{column}] AS [{alias}]"
             for column, alias in zip(safe_pk_list, pk_aliases, strict=True)
         )
+        writable_columns = self._get_writable_columns(table_name, safe_pk_list)
+        if writable_columns is None:
+            select_parts.append("T.*")
+        else:
+            select_parts.extend(
+                f"T.[{column}] AS [{column}]"
+                for column in writable_columns
+            )
         pk_join = ' AND '.join([f"T.{pk} = CT.{pk}" for pk in safe_pk_list])
 
         query = (
-            f"SELECT CT.SYS_CHANGE_OPERATION, CT.SYS_CHANGE_VERSION, "
-            f"{pk_select}, T.* "
+            f"SELECT {', '.join(select_parts)} "
             f"FROM CHANGETABLE(CHANGES {safe_table}, ?) AS CT "
             f"LEFT JOIN {safe_table} AS T ON {pk_join}"
         )
@@ -53,7 +64,7 @@ class SQLServerChangeDetector(AbstractChangeDetector):
             pk_values = [row[alias] for alias in pk_aliases]
             record_id = build_record_id([str(value) for value in pk_values])
 
-            payload = self._normalize_payload(table, row, pk_aliases)
+            payload = self._normalize_payload(table, row, pk_aliases, writable_columns)
             operations.append(
                 SyncOperation(
                     table_name=table_name,
@@ -83,23 +94,48 @@ class SQLServerChangeDetector(AbstractChangeDetector):
         primary_key = table_config.primary_key
         return primary_key if isinstance(primary_key, list) else [primary_key]
 
-    def _normalize_payload(self, table: TableConfig, row: dict[str, Any], pk_aliases: List[str]) -> dict[str, Any]:
-        """Build a writable payload without system, PK, or rowversion columns."""
+    def _get_writable_columns(self, table_name: str, primary_keys: List[str]) -> List[str] | None:
+        """Return table columns excluding SQL Server-generated version columns."""
+        query = """
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME = ?
+          AND DATA_TYPE NOT IN ('timestamp', 'rowversion')
+        ORDER BY ORDINAL_POSITION
+        """
+        rows = self.connector.execute_query(query, {"table_name": validate_identifier(table_name)})
+        if not rows or not all("COLUMN_NAME" in row for row in rows):
+            return None
+        primary_key_names = {column.lower() for column in primary_keys}
+        return [
+            row["COLUMN_NAME"]
+            for row in rows
+            if row["COLUMN_NAME"].lower() not in primary_key_names
+        ]
+
+    def _normalize_payload(
+        self,
+        table: TableConfig,
+        row: dict[str, Any],
+        pk_aliases: List[str],
+        writable_columns: List[str] | None,
+    ) -> dict[str, Any]:
+        """Build a writable payload without system, PK, or version columns."""
         primary_keys = self._get_primary_key_columns(table.name)
         excluded_columns = {
             "sys_change_operation",
             "sys_change_version",
-            "timestamp",
-            "rowversion",
             *(column.lower() for column in primary_keys),
             *(alias.lower() for alias in pk_aliases),
         }
         if table.version_column:
             excluded_columns.add(table.version_column.lower())
+        writable_names = {column.lower() for column in writable_columns} if writable_columns is not None else None
         return {
             key: value
             for key, value in row.items()
             if key is not None
             and key.lower() not in excluded_columns
+            and (writable_names is None or key.lower() in writable_names)
             and value is not None
         }
