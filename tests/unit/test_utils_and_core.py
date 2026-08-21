@@ -35,6 +35,47 @@ def test_conflict_resolver_prefers_latest_timestamp():
     assert result.remote_to_local == [remote]
     assert result.conflicts
 
+def test_conflict_resolver_ignores_duplicate_deletes():
+    resolver = ConflictResolver()
+    local = SyncOperation(
+        table_name="saCobroDocReng",
+        record_id="55|2",
+        operation_type=OperationType.DELETE,
+        change_version=10,
+    )
+    remote = SyncOperation(
+        table_name="saCobroDocReng",
+        record_id="55|2",
+        operation_type=OperationType.DELETE,
+        change_version=12,
+    )
+
+    result = resolver.resolve([local], [remote])
+
+    assert result.local_to_remote == []
+    assert result.remote_to_local == []
+    assert result.conflicts == []
+
+def test_conflict_resolver_keeps_delete_update_conflicts():
+    resolver = ConflictResolver()
+    local = SyncOperation(
+        table_name="saCobroDocReng",
+        record_id="55|2",
+        operation_type=OperationType.DELETE,
+        change_version=10,
+    )
+    remote = SyncOperation(
+        table_name="saCobroDocReng",
+        record_id="55|2",
+        operation_type=OperationType.UPDATE,
+        change_version=12,
+        data={"Monto": 100},
+    )
+
+    result = resolver.resolve([local], [remote])
+
+    assert result.conflicts
+
 def test_validate_table_dependencies_rejects_cycles():
     tables = [
         TableConfig(name="A", primary_key="Id", dependencies=["B"]),

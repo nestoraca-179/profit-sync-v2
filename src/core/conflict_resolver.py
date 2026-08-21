@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from src.models.sync_operation import OperationType
 from src.models.sync_operation import SyncOperation
 
 @dataclass(slots=True)
@@ -30,8 +31,15 @@ class ConflictResolver:
         result = ConflictResolutionResult()
         shared_keys = set(local_map) & set(remote_map)
         for key in shared_keys:
-            winner = self._choose_winner(local_map[key], remote_map[key])
-            loser = remote_map[key] if winner is local_map[key] else local_map[key]
+            local_operation = local_map[key]
+            remote_operation = remote_map[key]
+            if (
+                local_operation.operation_type == OperationType.DELETE
+                and remote_operation.operation_type == OperationType.DELETE
+            ):
+                continue
+            winner = self._choose_winner(local_operation, remote_operation)
+            loser = remote_operation if winner is local_operation else local_operation
             result.conflicts.append(
                 f"{key[0]}:{key[1]} -> {winner.change_version}>{loser.change_version}"
             )
